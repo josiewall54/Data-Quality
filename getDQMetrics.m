@@ -1,14 +1,28 @@
-% write a quick summary header
+% Compute data quality metrics
+%       
+%       sixtyNoise: the max power around 60 Hz & harmonics
+%       SNR: ratio between power in signal band and power in noise band
+%       baseNoise: min value of rectified, filtered, & binned signal
+%       highAmp: percentage of data that lies outside of N std devs
+%       shapeScore: *disregard* old metric from template-maching
+%
+
 function [sixtyNoise, SNR, baseNoise, highAmp, shapeScore, Pxx, Fxx, normPower, normTemplate] = getDQMetrics(emgData, params, templateCurves)
     
     [Pxx,Fxx] = pwelch(double(emgData), params.filterWindow, [], [], 2000);
-    
+   
     SNR = getSNR(params, Pxx, Fxx);
     baseNoise = getBaseNoise(emgData, params);
     highAmp = getHighAmp(emgData, params);
-    [shapeScore, normPower, normTemplate] = getShapeScore(Pxx, Fxx, templateCurves);
     sixtyNoise = getSixtyNoise(Pxx, Fxx, params.harmonicWindowSize);
-
+    
+    if templateCurves ~= 0
+        [shapeScore, normPower, normTemplate] = getShapeScore(Pxx, Fxx, templateCurves);
+    else
+        shapeScore = 0;
+        normPower = 0;
+        normTemplate = 0;
+    end
 end
 
 function [sixtyNoise] = getSixtyNoise(power, freq, windowSize)
@@ -23,10 +37,8 @@ function [sixtyNoise] = getSixtyNoise(power, freq, windowSize)
      
         thisSixtyNoise = noiseMax / surroundingSignal;
         sixtyNoise = max(sixtyNoise, thisSixtyNoise);
-    end
-    
+    end 
 end
-
 
 function [SNR] = getSNR(params, Pxx, Fxx)
     
@@ -50,8 +62,7 @@ function [SNR] = getSNR(params, Pxx, Fxx)
     lastStop = params.signalBand(2);
     signalMax = max(max(Pxx(Fxx >= lastStart & Fxx <= lastStop)), signalMax);
 
-    SNR = signalMax / noiseMax; %consider other calcs for SNR
-    
+    SNR = signalMax / noiseMax;
 end
 
 
@@ -61,7 +72,22 @@ function [baseNoise] = getBaseNoise(emgData, params)
     [D,C] = butter(2, params.lowPass/params.frequency*2, 'low');
 
     envelopes = filtfilt(D, C, abs(filtfilt(B,A,double(emgData))));
-    baseNoise = min(abs(envelopes));
+    binnedEnv = binEmg(envelopes, 0.05);
+    baseNoise = min(abs(binnedEnv));
+    
+end
+
+
+function binnedEmg = binEmg(emg, binSize)
+    
+    binnedTs = 1:binSize*30000:length(emg);
+    emg = emg / norm(emg);
+    binnedEmg = zeros(length(binnedTs) - 1, 1);
+
+    for i = 1:length(binnedTs) - 1
+        thisBin = emg(binnedTs(i):binnedTs(i+1));
+        binnedEmg(i) = mean(thisBin) * 100;   
+    end
 end
 
 

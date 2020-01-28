@@ -4,7 +4,12 @@
 
 function [data, labels, labelIdx, monkey, date, frequency] = loadFile(fileName, serverLocation, workingFolder)
 
-    copyfile([serverLocation fileName], workingFolder);   
+    try
+        copyfile([serverLocation fileName], workingFolder);
+    catch
+        disp('There was an issue copying the file from the server. Check server connection and file path')
+    end
+        
     
     if exist([workingFolder, fileName], 'file') ~= 2
         error('There was an issue copying the file from the server. Check server connection and file path')

@@ -9,14 +9,15 @@
 
 function [sixtyNoise, SNR, baseNoise, highAmp, shapeScore, Pxx, Fxx, normPower, normTemplate] = getDQMetrics(emgData, params, templateCurves)
     
-    [Pxx,Fxx] = pwelch(double(emgData), params.filterWindow, [], [], 2000);
+    %[Pxx,Fxx] = pwelch(double(emgData), params.filterWindow, [], [], 2000); %2000 should be dynamic
+    [Pxx, Fxx] = pwelch(double(emgData), params.filterWindow, [], [], params.frequency);
    
     SNR = getSNR(params, Pxx, Fxx);
     baseNoise = getBaseNoise(emgData, params);
     highAmp = getHighAmp(emgData, params);
     sixtyNoise = getSixtyNoise(Pxx, Fxx, params.harmonicWindowSize);
     
-    if templateCurves ~= 0
+    if exist('templateCurves', 'var') && templateCurves ~= 0
         [shapeScore, normPower, normTemplate] = getShapeScore(Pxx, Fxx, templateCurves);
     else
         shapeScore = 0;
@@ -73,7 +74,10 @@ function [baseNoise] = getBaseNoise(emgData, params)
 
     envelopes = filtfilt(D, C, abs(filtfilt(B,A,double(emgData))));
     binnedEnv = binEmg(envelopes, 0.05);
-    baseNoise = min(abs(binnedEnv));
+    
+    binnedEnv = sort(binnedEnv, 'ascend');
+    baseNoise = mean(binnedEnv(1:10));
+    %baseNoise = min(binnedEnv);
     
 end
 
@@ -86,7 +90,8 @@ function binnedEmg = binEmg(emg, binSize)
 
     for i = 1:length(binnedTs) - 1
         thisBin = emg(binnedTs(i):binnedTs(i+1));
-        binnedEmg(i) = mean(thisBin) * 100;   
+        binnedEmg(i) = sum(thisBin);
+        %binnedEmg(i) = mean(thisBin) * 100; %should this be a sum..?
     end
 end
 
